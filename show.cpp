@@ -14,7 +14,7 @@ namespace
         string s_;
         size_t length_;
 
-        friend ostream& operator <<(ostream& os, FixedLength& f)
+        friend ostream& operator <<(ostream& os, const FixedLength& f)
         {
             os << f.s_;
             for (size_t i = f.s_.length(); i < f.length_; ++i)
@@ -41,7 +41,7 @@ namespace
     {
         basic_string<uint8_t> s_;
 
-        friend ostream& operator <<(ostream& os, HexBytes& b)
+        friend ostream& operator <<(ostream& os, const HexBytes& b)
         {
             auto pat = format("%02x");
             cout << pat % (int)b.s_[0];
@@ -137,7 +137,7 @@ void show(PbrFat& pbr)
         cout << fixlen("BS_Reserved1:", 20) << pbr.fat12_16.BS_Reserved1 << endl;
         cout << fixlen("BS_BootSig:", 20) << pbr.fat12_16.BS_BootSig << endl;
         cout << fixlen("BS_VolID:", 20) << format("%08x") % pbr.fat12_16.BS_VolID << endl;
-        cout << fixlen("BS_FileSysType:", 20) << pbr.fat12_16.BS_FilSysType << endl;
+        cout << fixlen("BS_FilSysType:", 20) << fs_str_12_16 << endl;
     }
     else
     {
@@ -154,6 +154,6 @@ void show(PbrFat& pbr)
         cout << fixlen("BS_Reserved1:", 20) << pbr.fat32.BS_Reserved1 << endl;
         cout << fixlen("BS_BootSig:", 20) << pbr.fat32.BS_BootSig << endl;
         cout << fixlen("BS_VolID:", 20) << format("%08x") % pbr.fat32.BS_VolID << endl;
-        cout << fixlen("BS_FileSysType:", 20) << pbr.fat32.BS_FilSysType << endl;
+        cout << fixlen("BS_FilSysType:", 20) << fs_str_32 << endl;
     }
 }
