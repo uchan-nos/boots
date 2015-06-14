@@ -11,6 +11,7 @@
 
 #include "read.hpp"
 #include "show.hpp"
+#include "show_asm.hpp"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -72,6 +73,7 @@ int main(int argc, char** argv)
         desc.add_options()
             ("help", "Show this help")
             ("type,t", po::value<string>(), "Type of boot sector. 'mbr' or 'fat-pbr'")
+            ("asm", "Show disassembled code")
             ("input", po::value<string>(), "input file");
 
         po::positional_options_description pdesc;
@@ -110,7 +112,14 @@ int main(int argc, char** argv)
             if (*bs_type == "fat-pbr")
             {
                 read(pbr, bs_buf.data());
-                show(pbr);
+                if (vm.count("asm"))
+                {
+                    show_asm(pbr);
+                }
+                else
+                {
+                    show(pbr);
+                }
             }
             else
             {
