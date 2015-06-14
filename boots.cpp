@@ -13,6 +13,15 @@
 using namespace std;
 namespace po = boost::program_options;
 
+void show_usage(ostream& os, const po::options_description& desc)
+{
+    os <<
+        "Boot sector analyzer\n"
+        "Usage: boots [--type TYPE] FILE\n"
+        "\n";
+    os << desc;
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -32,12 +41,14 @@ int main(int argc, char** argv)
 
         if (vm.count("help"))
         {
-            cout <<
-                "Boot sector analyzer\n"
-                "Usage: boots [--type TYPE] FILE\n"
-                "\n";
-            cout << desc << endl;
+            show_usage(cout, desc);
             return 0;
+        }
+        if (vm.count("input") != 1)
+        {
+            cerr << "Need an input file\n\n";
+            show_usage(cerr, desc);
+            return 1;
         }
 
         ifstream input(vm["input"].as<string>(), ios::in | ios::binary);
