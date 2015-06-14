@@ -40,7 +40,7 @@ int main(int argc, char** argv)
             return 0;
         }
 
-        ifstream input(vm["input"].as<string>());
+        ifstream input(vm["input"].as<string>(), ios::in | ios::binary);
         uint8_t buf[512];
         input.read(reinterpret_cast<char *>(buf), 512);
         if (input.gcount() != 512)
