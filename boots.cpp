@@ -72,10 +72,10 @@ int main(int argc, char** argv)
     {
         po::options_description desc("Options");
         desc.add_options()
-            ("help", "Show this help")
-            ("type,t", po::value<string>(), "Type of boot sector. 'mbr' or 'fat-pbr'")
-            ("asm", "Show disassembled code")
-            ("input", po::value<string>(), "input file");
+            ("help,h", "Show this help")
+            ("type,t", po::value<string>(), "Type of boot sector. 'mbr' or 'pbr-fat'")
+            ("asm,a", "Show assembly code")
+            ;
 
         po::positional_options_description pdesc;
         pdesc.add("input", 1);
@@ -84,16 +84,10 @@ int main(int argc, char** argv)
         po::store(po::command_line_parser(argc, argv).options(desc).positional(pdesc).run(), vm);
         po::notify(vm);
 
-        if (vm.count("help"))
+        if (vm.count("help") || vm.count("input") == 0)
         {
             show_usage(cout, desc);
             return 0;
-        }
-        if (vm.count("input") != 1)
-        {
-            cerr << "Need an input file\n\n";
-            show_usage(cerr, desc);
-            return 1;
         }
 
         ifstream input(vm["input"].as<string>(), ios::in | ios::binary);
