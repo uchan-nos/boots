@@ -5,7 +5,7 @@ using namespace std;
 BootSector::~BootSector()
 {}
 
-BootSector::Type infer(const uint8_t* data)
+BootSector::Type infer(const std::array<uint8_t, 512>& data)
 {
     if (data[510] == 0x55 && data[511] == 0xaa)
     {
@@ -24,7 +24,7 @@ BootSector::Type infer(const uint8_t* data)
 }
 
 std::unique_ptr<BootSector> make_bs(
-        const uint8_t* data, BootSector::Type type)
+        const std::array<uint8_t, 512>& data, BootSector::Type type)
 {
     switch (type)
     {

@@ -9,51 +9,53 @@ using namespace boost;
 using namespace readutil;
 using namespace showutil;
 
-PbrFat::PbrFat(const uint8_t* data)
+PbrFat::PbrFat(const std::array<uint8_t, 512>& data)
 {
-    data = read(this->BS_jmpBoot, data);
-    data = read(this->BS_OEMName, data);
-    data = read16(this->BPB_BytsPerSec, data);
-    data = read8(this->BPB_SecPerClus, data);
-    data = read16(this->BPB_RsvdSecCnt, data);
-    data = read8(this->BPB_NumFATs, data);
-    data = read16(this->BPB_RootEntCnt, data);
-    data = read16(this->BPB_TotSec16, data);
-    data = read8(this->BPB_Media, data);
-    data = read16(this->BPB_FATSz16, data);
-    data = read16(this->BPB_SecPerTrk, data);
-    data = read16(this->BPB_NumHeads, data);
-    data = read32(this->BPB_HiddSec, data);
-    data = read32(this->BPB_TotSec32, data);
+    const uint8_t* data_ = data.data();
 
-    const uint8_t* data0 = data;
+    data_ = read(this->BS_jmpBoot, data_);
+    data_ = read(this->BS_OEMName, data_);
+    data_ = read16(this->BPB_BytsPerSec, data_);
+    data_ = read8(this->BPB_SecPerClus, data_);
+    data_ = read16(this->BPB_RsvdSecCnt, data_);
+    data_ = read8(this->BPB_NumFATs, data_);
+    data_ = read16(this->BPB_RootEntCnt, data_);
+    data_ = read16(this->BPB_TotSec16, data_);
+    data_ = read8(this->BPB_Media, data_);
+    data_ = read16(this->BPB_FATSz16, data_);
+    data_ = read16(this->BPB_SecPerTrk, data_);
+    data_ = read16(this->BPB_NumHeads, data_);
+    data_ = read32(this->BPB_HiddSec, data_);
+    data_ = read32(this->BPB_TotSec32, data_);
 
-    data = read8(this->fat12_16.BS_DrvNum, data);
-    data = read8(this->fat12_16.BS_Reserved1, data);
-    data = read8(this->fat12_16.BS_BootSig, data);
-    data = read32(this->fat12_16.BS_VolID, data);
-    data = read(this->fat12_16.BS_VolLab, data);
-    data = read(this->fat12_16.BS_FilSysType, data);
-    data = read(this->fat12_16.boot_program, data);
+    const uint8_t* data0 = data_;
 
-    data = data0;
+    data_ = read8(this->fat12_16.BS_DrvNum, data_);
+    data_ = read8(this->fat12_16.BS_Reserved1, data_);
+    data_ = read8(this->fat12_16.BS_BootSig, data_);
+    data_ = read32(this->fat12_16.BS_VolID, data_);
+    data_ = read(this->fat12_16.BS_VolLab, data_);
+    data_ = read(this->fat12_16.BS_FilSysType, data_);
+    data_ = read(this->fat12_16.boot_program, data_);
 
-    data = read32(this->fat32.BPB_FATSz32, data);
-    data = read16(this->fat32.BPB_ExtFlags, data);
-    data = read(this->fat32.BPB_FSVer, data);
-    data = read32(this->fat32.BPB_RootClus, data);
-    data = read16(this->fat32.BPB_FSInfo, data);
-    data = read16(this->fat32.BPB_BkBootSec, data);
-    data = read(this->fat32.BPB_Reserved, data);
-    data = read8(this->fat32.BS_DrvNum, data);
-    data = read8(this->fat32.BS_Reserved1, data);
-    data = read8(this->fat32.BS_BootSig, data);
-    data = read32(this->fat32.BS_VolID, data);
-    data = read(this->fat32.BS_VolLab, data);
-    data = read(this->fat32.BS_FilSysType, data);
-    data = read(this->fat32.boot_program, data);
+    data_ = data0;
 
-    data = read(this->last_signature, data);
+    data_ = read32(this->fat32.BPB_FATSz32, data_);
+    data_ = read16(this->fat32.BPB_ExtFlags, data_);
+    data_ = read(this->fat32.BPB_FSVer, data_);
+    data_ = read32(this->fat32.BPB_RootClus, data_);
+    data_ = read16(this->fat32.BPB_FSInfo, data_);
+    data_ = read16(this->fat32.BPB_BkBootSec, data_);
+    data_ = read(this->fat32.BPB_Reserved, data_);
+    data_ = read8(this->fat32.BS_DrvNum, data_);
+    data_ = read8(this->fat32.BS_Reserved1, data_);
+    data_ = read8(this->fat32.BS_BootSig, data_);
+    data_ = read32(this->fat32.BS_VolID, data_);
+    data_ = read(this->fat32.BS_VolLab, data_);
+    data_ = read(this->fat32.BS_FilSysType, data_);
+    data_ = read(this->fat32.boot_program, data_);
+
+    data_ = read(this->last_signature, data_);
 }
 
 void PbrFat::print_info(std::ostream& os) const

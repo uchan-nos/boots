@@ -12,7 +12,6 @@
 
 #include "read.hpp"
 #include "show.hpp"
-#include "show_asm.hpp"
 
 using namespace std;
 namespace po = boost::program_options;
@@ -26,46 +25,6 @@ void show_usage(ostream& os, const po::options_description& desc)
     os << desc;
 }
 
-boost::optional<string> predict_type(const array<uint8_t, 512>& bs_buf)
-{
-    if (bs_buf[510] != 0x55 || bs_buf[511] != 0xaa)
-    {
-        // not bootable
-        return boost::optional<string>();
-    }
-    else if ((bs_buf[0] == 0xeb && bs_buf[2] == 0x90) || bs_buf[0] == 0xe9)
-    {
-        // right jump instruction
-        return boost::optional<string>("fat-pbr");
-    }
-    else
-    {
-        // count active flags
-        int count00 = 0, count80 = 0;
-        for (int i = 0; i < 4; ++i)
-        {
-            const uint8_t active_flag = bs_buf[0x1be + 16 * i];
-            if (active_flag == 0x80)
-            {
-                ++count80;
-            }
-            else if (active_flag == 0x00)
-            {
-                ++count00;
-            }
-        }
-
-        if ((count00 + count80) == 4)
-        {
-            // all active flags are 0x00 or 0x80
-            return boost::optional<string>("mbr");
-        }
-    }
-
-    // unknown type
-    return boost::optional<string>();
-}
-
 int main(int argc, char** argv)
 {
     try
@@ -75,6 +34,7 @@ int main(int argc, char** argv)
             ("help,h", "Show this help")
             ("type,t", po::value<string>(), "Type of boot sector. 'mbr' or 'pbr-fat'")
             ("asm,a", "Show assembly code")
+            ("input", po::value<string>(), "")
             ;
 
         po::positional_options_description pdesc;
@@ -99,7 +59,7 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        BootSector::Type type = BootSector::Type::kUnknown;
+        BootSector::Type bs_type = BootSector::Type::kUnknown;
 
         if (vm.count("type"))
         {
@@ -107,22 +67,22 @@ int main(int argc, char** argv)
 
             if (t == "pbr")
             {
-                type = BootSector::Type::kPbrFat;
+                bs_type = BootSector::Type::kPbrFat;
             }
         }
         else
         {
-            type = infer(buf);
+            bs_type = infer(bs_buf);
         }
 
 
-        if (type == BootSector::Type::kUnknown)
+        if (bs_type == BootSector::Type::kUnknown)
         {
             cout << "Unkonwn boot sector type." << endl;
             return 1;
         }
 
-        unique_ptr<BootSector> bs = make_bs(buf, type);
+        unique_ptr<BootSector> bs = make_bs(bs_buf, bs_type);
 
         if (!bs)
         {

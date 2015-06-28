@@ -1,6 +1,7 @@
 #ifndef BOOTSECTOR_HPP_
 #define BOOTSECTOR_HPP_
 
+#include <array>
 #include <ostream>
 #include <memory>
 #include <cstdint>
@@ -34,7 +35,7 @@ class Mbr : public BootSector
 
     uint8_t last_signature[2];
 public:
-    Mbr(const uint8_t* data);
+    Mbr(const std::array<uint8_t, 512>& data);
     void print_info(std::ostream& os) const;
     void print_asm(std::ostream& os) const;
 };
@@ -87,14 +88,14 @@ class PbrFat : public BootSector
 
     uint8_t last_signature[2];
 public:
-    PbrFat(const uint8_t* data);
+    PbrFat(const std::array<uint8_t, 512>& data);
     void print_info(std::ostream& os) const;
     void print_asm(std::ostream& os) const;
 };
 
-BootSector::Type infer(const uint8_t* data);
+BootSector::Type infer(const std::array<uint8_t, 512>& data);
 std::unique_ptr<BootSector> make_bs(
-        const uint8_t* data, BootSector::Type type);
+        const std::array<uint8_t, 512>& data, BootSector::Type type);
 
 unsigned int cylinder(const uint8_t (&chs)[3]);
 unsigned int head(const uint8_t (&chs)[3]);

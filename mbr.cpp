@@ -9,21 +9,23 @@ using namespace boost;
 using namespace readutil;
 using namespace showutil;
 
-Mbr::Mbr(const uint8_t* data)
+Mbr::Mbr(const std::array<uint8_t, 512>& data)
 {
-    data = read(this->boot_code, data);
+    const uint8_t* data_ = data.data();
+
+    data_ = read(this->boot_code, data_);
 
     for (int i = 0; i < 4; ++i)
     {
-        data = read8(this->part_table[i].active, data);
-        data = read(this->part_table[i].chs_start, data);
-        data = read8(this->part_table[i].type, data);
-        data = read(this->part_table[i].chs_end, data);
-        data = read32(this->part_table[i].lba_start, data);
-        data = read32(this->part_table[i].size, data);
+        data_ = read8(this->part_table[i].active, data_);
+        data_ = read(this->part_table[i].chs_start, data_);
+        data_ = read8(this->part_table[i].type, data_);
+        data_ = read(this->part_table[i].chs_end, data_);
+        data_ = read32(this->part_table[i].lba_start, data_);
+        data_ = read32(this->part_table[i].size, data_);
     }
 
-    data = read(this->last_signature, data);
+    data_ = read(this->last_signature, data_);
 }
 
 void Mbr::print_info(std::ostream& os) const
