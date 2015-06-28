@@ -1,6 +1,12 @@
 #include "bootsector.hpp"
 
+#include <vector>
+#include <string>
+#include <Poco/Process.h>
+#include <Poco/Pipe.h>
+#include <Poco/PipeStream.h>
 #include <boost/format.hpp>
+#include <boost/regex.hpp>
 #include "read.hpp"
 #include "show.hpp"
 
@@ -144,5 +150,46 @@ void PbrFat::print_info(std::ostream& os) const
 
 void PbrFat::print_asm(std::ostream& os) const
 {
+    unsigned int skipStart = 0, skipBytes = 0;
+    if (BS_jmpBoot[0] == 0xeb)
+    {
+        // short jump
+        skipBytes = BS_jmpBoot[1] - 1;
+    }
+    else if (BS_jmpBoot[0] == 0xe9)
+    {
+        // near jump
+        skipBytes = BS_jmpBoot[1]
+            | (static_cast<unsigned int>(BS_jmpBoot[2]) << 8);
+    }
+    Poco::Process::Args args;
+    args.push_back("-b");
+    args.push_back("16");
+    args.push_back("-k");
+    args.push_back(str(format("3,%d") % skipBytes));
+    args.push_back("pbr.bin");
+
+    Poco::Pipe stdout_pipe;
+    auto proc = Poco::Process::launch("ndisasm", args, nullptr, &stdout_pipe, nullptr);
+    Poco::PipeInputStream is(stdout_pipe);
+
+    const regex disasm_pattern("^[0-9A-Fa-f]+\\s+([0-9A-Fa-f]+)\\s+(.+)$");
+    const regex skip_pattern("^[0-9A-Fa-f]+\\s+skipping.*$");
+
+    string line;
+    while (getline(is, line))
+    {
+        smatch m;
+        if (regex_match(line, m, disasm_pattern))
+        {
+            os << "    " << m[2] << endl;
+        }
+        else if (regex_match(line, m, skip_pattern))
+        {
+            os << "    db \""
+                << string(reinterpret_cast<const char *>(BS_OEMName), 8)
+                << '"' << endl;
+        }
+    }
 }
 

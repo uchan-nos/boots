@@ -85,13 +85,14 @@
     <ClInclude Include="bootsector.hpp" />
     <ClInclude Include="read.hpp" />
     <ClInclude Include="show.hpp" />
-    <ClInclude Include="show_asm.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="boots.cpp" />
+    <ClCompile Include="bootsector.cpp" />
+    <ClCompile Include="mbr.cpp" />
+    <ClCompile Include="pbrfat.cpp" />
     <ClCompile Include="read.cpp" />
     <ClCompile Include="show.cpp" />
-    <ClCompile Include="show_asm.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

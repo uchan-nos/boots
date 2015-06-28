@@ -2,7 +2,7 @@
 #define READ_HPP_
 
 #include <algorithm>
-#include <cstddef>
+#include <cstdint>
 
 namespace readutil
 {
