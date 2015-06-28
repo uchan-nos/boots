@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <memory>
 #include <boost/program_options.hpp>
 #include <boost/optional.hpp>
 
@@ -104,33 +105,44 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        boost::optional<string> bs_type = vm.count("type") ? vm["type"].as<string>() : predict_type(bs_buf);
+        BootSector::Type type = BootSector::Type::kUnknown;
 
-        PbrFat pbr;
-        if (bs_type)
+        if (vm.count("type"))
         {
-            if (*bs_type == "fat-pbr")
+            string t = vm["type"].as<string>();
+
+            if (t == "pbr")
             {
-                read(pbr, bs_buf.data());
-                if (vm.count("asm"))
-                {
-                    show_asm(pbr);
-                }
-                else
-                {
-                    show(pbr);
-                }
-            }
-            else
-            {
-                cerr << "Unknown type: " << *bs_type << endl;
-                return 1;
+                type = BootSector::Type::kPbrFat;
             }
         }
         else
         {
-            cerr << "Failed to predict type of boot sector." << endl;
+            type = infer(buf);
+        }
+
+
+        if (type == BootSector::Type::kUnknown)
+        {
+            cout << "Unkonwn boot sector type." << endl;
             return 1;
+        }
+
+        unique_ptr<BootSector> bs = make_bs(buf, type);
+
+        if (!bs)
+        {
+            cout << "bs is null. bug?" << endl;
+            return 1;
+        }
+
+        if (vm.count("asm"))
+        {
+            bs->print_asm(cout);
+        }
+        else
+        {
+            bs->print_info(cout);
         }
     }
     catch (const po::error& e)

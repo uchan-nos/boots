@@ -1,9 +1,22 @@
 #ifndef READ_HPP_
 #define READ_HPP_
 
-#include "bootsector.hpp"
+#include <algorithm>
+#include <cstddef>
 
-void read(Mbr& mbr, const uint8_t* data);
-void read(PbrFat& pbr, const uint8_t* data);
+namespace readutil
+{
+    const uint8_t* read8(uint8_t& v, const uint8_t* data);
+    const uint8_t* read16(uint16_t& v, const uint8_t* data);
+    const uint8_t* read24(uint32_t& v, const uint8_t* data);
+    const uint8_t* read32(uint32_t& v, const uint8_t* data);
+
+    template <size_t N>
+    const uint8_t* read(uint8_t (&v)[N], const uint8_t* data)
+    {
+        std::copy_n(data, N, v);
+        return data + N;
+    }
+}
 
 #endif

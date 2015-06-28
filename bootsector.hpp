@@ -1,13 +1,45 @@
 #ifndef BOOTSECTOR_HPP_
 #define BOOTSECTOR_HPP_
 
+#include <ostream>
+#include <memory>
 #include <cstdint>
 
-struct Mbr
+class BootSector
 {
+public:
+    enum class Type
+    {
+        kMbr, kPbrFat, kUnknown
+    };
+
+    virtual ~BootSector();
+    virtual void print_info(std::ostream& os) const = 0;
+    virtual void print_asm(std::ostream& os) const = 0;
 };
 
-struct PbrFat
+class Mbr : public BootSector
+{
+    uint8_t boot_code[446];
+
+    struct Partition
+    {
+        uint8_t active;
+        uint8_t chs_start[3];
+        uint8_t type;
+        uint8_t chs_end[3];
+        uint32_t lba_start;
+        uint32_t size;
+    } part_table[4];
+
+    uint8_t last_signature[2];
+public:
+    Mbr(const uint8_t* data);
+    void print_info(std::ostream& os) const;
+    void print_asm(std::ostream& os) const;
+};
+
+class PbrFat : public BootSector
 {
     uint8_t BS_jmpBoot[3];
     uint8_t BS_OEMName[8];
@@ -54,6 +86,18 @@ struct PbrFat
     } fat32;
 
     uint8_t last_signature[2];
+public:
+    PbrFat(const uint8_t* data);
+    void print_info(std::ostream& os) const;
+    void print_asm(std::ostream& os) const;
 };
+
+BootSector::Type infer(const uint8_t* data);
+std::unique_ptr<BootSector> make_bs(
+        const uint8_t* data, BootSector::Type type);
+
+unsigned int cylinder(const uint8_t (&chs)[3]);
+unsigned int head(const uint8_t (&chs)[3]);
+unsigned int sector(const uint8_t (&chs)[3]);
 
 #endif
