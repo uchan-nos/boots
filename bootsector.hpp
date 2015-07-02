@@ -91,6 +91,9 @@ public:
     PbrFat(const std::array<uint8_t, 512>& data);
     void print_info(std::ostream& os) const;
     void print_asm(std::ostream& os) const;
+
+private:
+    int determine_fat_type() const;
 };
 
 BootSector::Type infer(const std::array<uint8_t, 512>& data);

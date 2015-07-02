@@ -1,7 +1,14 @@
 #include "bootsector.hpp"
 
+// for numeric_limits::max
+#define NOMINMAX
+
 #include <vector>
 #include <string>
+#include <utility>
+#include <limits>
+#include <sstream>
+#include <type_traits>
 #include <Poco/Process.h>
 #include <Poco/Pipe.h>
 #include <Poco/PipeStream.h>
@@ -14,6 +21,34 @@ using namespace std;
 using namespace boost;
 using namespace readutil;
 using namespace showutil;
+
+namespace
+{
+    const char dbwd_table[4] = {'b', 'w', 0, 'd'};
+
+    template <typename T>
+    uint32_t dbwd(ostream& os, uint32_t current_address, uint32_t limit_address,
+        T value, typename std::enable_if<sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4>::type* = 0)
+    {
+        if (current_address - sizeof(T) < limit_address)
+        {
+            os << "    d" << dbwd_table[sizeof(T) - 1] << " " << value << '\n';
+            return current_address + sizeof(T);
+        }
+        return current_address;
+    }
+
+    uint32_t db_str(ostream& os, uint32_t current_address, uint32_t limit_address,
+        const uint8_t* value, size_t length)
+    {
+        if (current_address - length < limit_address)
+        {
+            os << "    db " << string(reinterpret_cast<const char*>(value), length) << '\n';
+            return current_address + length;
+        }
+        return current_address;
+    }
+}
 
 PbrFat::PbrFat(const std::array<uint8_t, 512>& data)
 {
@@ -66,25 +101,7 @@ PbrFat::PbrFat(const std::array<uint8_t, 512>& data)
 
 void PbrFat::print_info(std::ostream& os) const
 {
-    // Determin FAT type
-    size_t root_dir_sectors =
-        (BPB_RootEntCnt * 32 + BPB_BytsPerSec - 1) / BPB_BytsPerSec;
-
-    const size_t fat_size =
-        BPB_FATSz16 != 0 ? BPB_FATSz16 : fat32.BPB_FATSz32;
-
-    const size_t total_sectors =
-        BPB_TotSec16 != 0 ? BPB_TotSec16 : BPB_TotSec32;
-
-    const size_t data_sectors = total_sectors
-        - (BPB_RsvdSecCnt + BPB_NumFATs * fat_size + root_dir_sectors);
-
-    const size_t count_of_clusters = data_sectors / BPB_SecPerClus;
-
-    const int fat_type =
-        count_of_clusters < 4085 ? 12
-        : count_of_clusters < 65525 ? 16
-        : 32;
+    const int fat_type = determine_fat_type();
 
     os << "Calculated fat type is FAT" << fat_type << endl;
 
@@ -150,6 +167,8 @@ void PbrFat::print_info(std::ostream& os) const
 
 void PbrFat::print_asm(std::ostream& os) const
 {
+    const int fat_type = determine_fat_type();
+
     unsigned int skipStart = 0, skipBytes = 0;
     if (BS_jmpBoot[0] == 0xeb)
     {
@@ -166,14 +185,20 @@ void PbrFat::print_asm(std::ostream& os) const
     args.push_back("-b");
     args.push_back("16");
     args.push_back("-k");
-    args.push_back(str(format("3,%d") % skipBytes));
+    args.push_back(str(format("3,%d") % skipBytes)); // skip bpb section
+    args.push_back("-k");
+    args.push_back("510,2"); // skip last signature
     args.push_back("pbr.bin");
 
     Poco::Pipe stdout_pipe;
     auto proc = Poco::Process::launch("ndisasm", args, nullptr, &stdout_pipe, nullptr);
     Poco::PipeInputStream is(stdout_pipe);
 
-    const regex disasm_pattern("^[0-9A-Fa-f]+\\s+([0-9A-Fa-f]+)\\s+(.+)$");
+    vector<pair<uint32_t, string>> instructions;
+    int skip_index = -1; // index of "skipping" line.
+    uint32_t zero_region_address = numeric_limits<uint32_t>::max(); // start address of the last all zero region.
+
+    const regex disasm_pattern("^([0-9A-Fa-f]+)\\s+([0-9A-Fa-f]+)\\s+(.+)$");
     const regex skip_pattern("^[0-9A-Fa-f]+\\s+skipping.*$");
 
     string line;
@@ -182,14 +207,120 @@ void PbrFat::print_asm(std::ostream& os) const
         smatch m;
         if (regex_match(line, m, disasm_pattern))
         {
-            os << "    " << m[2] << endl;
+            // convert hex string to integer
+            uint32_t address;
+            stringstream ss;
+            ss << hex << m[1];
+            ss >> address;
+
+            if (m[2] == "0000")
+            {
+                if (zero_region_address == numeric_limits<uint32_t>::max())
+                {
+                    zero_region_address = address;
+                }
+            }
+            else
+            {
+                zero_region_address = numeric_limits<uint32_t>::max();
+                instructions.push_back(make_pair(address, m[3]));
+            }
         }
         else if (regex_match(line, m, skip_pattern))
         {
-            os << "    db \""
-                << string(reinterpret_cast<const char *>(BS_OEMName), 8)
-                << '"' << endl;
+            if (skip_index == -1)
+            {
+                skip_index = instructions.size();
+            }
         }
     }
+
+    for (int i = 0; i < instructions.size(); ++i)
+    {
+        if (i == skip_index)
+        {
+            uint32_t current = i > 0 ? instructions[i - 1].first : 0;
+            const uint32_t lim = instructions[i].first;
+
+            current = db_str(os, current, lim, BS_OEMName, 8);
+            current = dbwd(os, current, lim, BPB_BytsPerSec);
+            current = dbwd(os, current, lim, BPB_SecPerClus);
+            current = dbwd(os, current, lim, BPB_RsvdSecCnt);
+            current = dbwd(os, current, lim, BPB_NumFATs);
+            current = dbwd(os, current, lim, BPB_RootEntCnt);
+            current = dbwd(os, current, lim, BPB_TotSec16);
+            current = dbwd(os, current, lim, BPB_Media);
+            current = dbwd(os, current, lim, BPB_FATSz16);
+            current = dbwd(os, current, lim, BPB_SecPerTrk);
+            current = dbwd(os, current, lim, BPB_NumHeads);
+            current = dbwd(os, current, lim, BPB_HiddSec);
+            current = dbwd(os, current, lim, BPB_TotSec32);
+
+            if (fat_type == 12 || fat_type == 16)
+            {
+                current = dbwd(os, current, lim, fat12_16.BS_DrvNum);
+                current = dbwd(os, current, lim, fat12_16.BS_Reserved1);
+                current = dbwd(os, current, lim, fat12_16.BS_BootSig);
+                current = dbwd(os, current, lim, fat12_16.BS_VolID);
+                current = db_str(os, current, lim, fat12_16.BS_VolLab, 11);
+                current = db_str(os, current, lim, fat12_16.BS_FilSysType, 8);
+            }
+            else
+            {
+                current = dbwd(os, current, lim, fat32.BPB_FATSz32);
+                current = dbwd(os, current, lim, fat32.BPB_ExtFlags);
+                current = dbwd(os, current, lim, fat32.BPB_FSVer);
+                current = dbwd(os, current, lim, fat32.BPB_RootClus);
+                current = dbwd(os, current, lim, fat32.BPB_FSInfo);
+                current = dbwd(os, current, lim, fat32.BPB_BkBootSec);
+                current = dbwd(os, current, lim, fat32.BPB_Reserved);
+                current = dbwd(os, current, lim, fat32.BS_DrvNum);
+                current = dbwd(os, current, lim, fat32.BS_Reserved1);
+                current = dbwd(os, current, lim, fat32.BS_BootSig);
+                current = dbwd(os, current, lim, fat32.BS_VolID);
+                current = db_str(os, current, lim, fat32.BS_VolLab, 11);
+                current = db_str(os, current, lim, fat32.BS_FilSysType, 8);
+            }
+
+            if (current < lim)
+            {
+                os << "    times " << format("0x%02x") % lim << " - ($ - $$) db 0" << endl;
+            }
+        }
+
+        os << "    " << instructions[i].second << endl;
+    }
+
+    if (zero_region_address != numeric_limits<uint32_t>::max())
+    {
+        os << "    times 0x1fe - ($ - $$) db 0" << endl;
+    }
+
+    os << "    db 0x55, 0xaa" << endl;
+}
+
+int PbrFat::determine_fat_type() const
+{
+    // Determin FAT type
+    size_t root_dir_sectors =
+        (BPB_RootEntCnt * 32 + BPB_BytsPerSec - 1) / BPB_BytsPerSec;
+
+    const size_t fat_size =
+        BPB_FATSz16 != 0 ? BPB_FATSz16 : fat32.BPB_FATSz32;
+
+    const size_t total_sectors =
+        BPB_TotSec16 != 0 ? BPB_TotSec16 : BPB_TotSec32;
+
+    const size_t data_sectors = total_sectors
+        - (BPB_RsvdSecCnt + BPB_NumFATs * fat_size + root_dir_sectors);
+
+    const size_t count_of_clusters = data_sectors / BPB_SecPerClus;
+
+    const int fat_type =
+        count_of_clusters < 4085 ? 12
+        : count_of_clusters < 65525 ? 16
+        : 32;
+
+    return fat_type;
 }
 
