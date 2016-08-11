@@ -8,11 +8,16 @@
 
 class BootSector
 {
+    std::array<uint8_t, 512> data_;
+
 public:
     enum class Type
     {
         kMbr, kPbrFat, kUnknown
     };
+
+    BootSector(const std::array<uint8_t, 512>& data);
+    const std::array<uint8_t, 512>& data() const;
 
     virtual ~BootSector();
     virtual void print_info(std::ostream& os) const = 0;

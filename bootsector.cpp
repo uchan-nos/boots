@@ -2,6 +2,15 @@
 
 using namespace std;
 
+BootSector::BootSector(const std::array<uint8_t, 512>& data)
+    : data_(data)
+{}
+
+const std::array<uint8_t, 512>& BootSector::data() const
+{
+    return data_;
+}
+
 BootSector::~BootSector()
 {}
 

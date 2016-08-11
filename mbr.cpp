@@ -10,6 +10,7 @@ using namespace readutil;
 using namespace showutil;
 
 Mbr::Mbr(const std::array<uint8_t, 512>& data)
+    : BootSector(data)
 {
     const uint8_t* data_ = data.data();
 

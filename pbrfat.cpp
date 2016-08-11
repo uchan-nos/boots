@@ -16,6 +16,7 @@
 #include <boost/regex.hpp>
 #include "read.hpp"
 #include "show.hpp"
+#include "tempfile.hpp"
 
 using namespace std;
 using namespace boost;
@@ -30,7 +31,7 @@ namespace
     uint32_t dbwd(ostream& os, uint32_t current_address, uint32_t limit_address,
         T value, typename std::enable_if<sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4>::type* = 0)
     {
-        if (current_address - sizeof(T) < limit_address)
+        if (current_address + sizeof(T) < limit_address)
         {
             os << "    d" << dbwd_table[sizeof(T) - 1] << " " << value << '\n';
             return current_address + sizeof(T);
@@ -41,9 +42,9 @@ namespace
     uint32_t db_str(ostream& os, uint32_t current_address, uint32_t limit_address,
         const uint8_t* value, size_t length)
     {
-        if (current_address - length < limit_address)
+        if (current_address + length < limit_address)
         {
-            os << "    db " << string(reinterpret_cast<const char*>(value), length) << '\n';
+            os << "    db \"" << string(reinterpret_cast<const char*>(value), length) << "\"\n";
             return current_address + length;
         }
         return current_address;
@@ -51,6 +52,7 @@ namespace
 }
 
 PbrFat::PbrFat(const std::array<uint8_t, 512>& data)
+    : BootSector(data)
 {
     const uint8_t* data_ = data.data();
 
@@ -144,6 +146,8 @@ void PbrFat::print_info(std::ostream& os) const
         os << fixlen("BS_Reserved1:", 20) << fat12_16.BS_Reserved1 << endl;
         os << fixlen("BS_BootSig:", 20) << fat12_16.BS_BootSig << endl;
         os << fixlen("BS_VolID:", 20) << format("%08x") % fat12_16.BS_VolID << endl;
+        os << fixlen("BS_VolLab:", 20)
+            << string(reinterpret_cast<const char *>(fat12_16.BS_VolLab), 11) << endl;
         os << fixlen("BS_FilSysType:", 20) << fs_str_12_16 << endl;
     }
     else
@@ -161,6 +165,8 @@ void PbrFat::print_info(std::ostream& os) const
         os << fixlen("BS_Reserved1:", 20) << fat32.BS_Reserved1 << endl;
         os << fixlen("BS_BootSig:", 20) << fat32.BS_BootSig << endl;
         os << fixlen("BS_VolID:", 20) << format("%08x") % fat32.BS_VolID << endl;
+        os << fixlen("BS_VolLab:", 20)
+            << string(reinterpret_cast<const char *>(fat32.BS_VolLab), 11) << endl;
         os << fixlen("BS_FilSysType:", 20) << fs_str_32 << endl;
     }
 }
@@ -181,6 +187,16 @@ void PbrFat::print_asm(std::ostream& os) const
         skipBytes = BS_jmpBoot[1]
             | (static_cast<unsigned int>(BS_jmpBoot[2]) << 8);
     }
+
+    // write bs to temporary file.
+    // it will be removed at the end of this function automatically by TemporaryFile's destructor.
+    TemporaryFile temp_file;
+    ofstream temp_ofs(temp_file.path().native(), ios::out | ios::binary);
+    const auto& bs_data = this->data();
+    temp_ofs.write(reinterpret_cast<const char*>(bs_data.data()), bs_data.size());
+    temp_ofs.flush();
+    temp_ofs.close();
+
     Poco::Process::Args args;
     args.push_back("-b");
     args.push_back("16");
@@ -188,7 +204,7 @@ void PbrFat::print_asm(std::ostream& os) const
     args.push_back(str(format("3,%d") % skipBytes)); // skip bpb section
     args.push_back("-k");
     args.push_back("510,2"); // skip last signature
-    args.push_back("pbr.bin");
+    args.push_back(temp_file.path().string());
 
     Poco::Pipe stdout_pipe;
     auto proc = Poco::Process::launch("ndisasm", args, nullptr, &stdout_pipe, nullptr);
@@ -286,9 +302,25 @@ void PbrFat::print_asm(std::ostream& os) const
             {
                 os << "    times " << format("0x%02x") % lim << " - ($ - $$) db 0" << endl;
             }
+
+            os << "entry:" << endl;
         }
 
-        os << "    " << instructions[i].second << endl;
+        if (i == 0)
+        {
+            if (BS_jmpBoot[0] == 0xeb)
+            {
+                os << "    jmp short entry" << endl;
+            }
+            else
+            {
+                os << "    jmp near entry" << endl;
+            }
+        }
+        else
+        {
+            os << "    " << instructions[i].second << endl;
+        }
     }
 
     if (zero_region_address != numeric_limits<uint32_t>::max())
