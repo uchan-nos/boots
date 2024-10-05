@@ -9,6 +9,7 @@
 #include <limits>
 #include <sstream>
 #include <type_traits>
+#include <fstream>
 #include <Poco/Process.h>
 #include <Poco/Pipe.h>
 #include <Poco/PipeStream.h>
